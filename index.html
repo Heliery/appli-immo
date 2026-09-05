@@ -534,11 +534,14 @@ let stopsData = CITIES[currentCityKey].stops;
 // ---------- map setup ----------
 const map = L.map('map', { scrollWheelZoom:true, preferCanvas: true });
 
-// Street-level basemap, free & keyless (CartoDB/CARTO now requires a paid API
-// key for their basemap tiles, so we use standard OpenStreetMap tiles instead).
-const baseTiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-  subdomains: 'abc',
+// Street-level basemap, free & keyless. Both CartoDB (needs a paid API key now)
+// and standard OpenStreetMap tiles (block requests with no Referer header —
+// which is exactly what happens when this file is opened locally via file://)
+// are unreliable for a standalone HTML file. Esri's World Street Map tiles are
+// free, keyless, and don't enforce a Referer check, so they work the same way
+// whether this file is opened locally or hosted online.
+const baseTiles = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+  attribution: 'Tiles &copy; Esri &mdash; Source: Esri, HERE, Garmin, USGS, Intermap, INCREMENT P, NRCan, Esri Japan, METI, Esri China (Hong Kong), Esri Korea, Esri (Thailand), NGCC, &copy; OpenStreetMap contributors, and the GIS User Community',
   maxZoom: 19
 }).addTo(map);
 
