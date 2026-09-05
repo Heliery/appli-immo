@@ -534,11 +534,12 @@ let stopsData = CITIES[currentCityKey].stops;
 // ---------- map setup ----------
 const map = L.map('map', { scrollWheelZoom:true, preferCanvas: true });
 
-// Street-level basemap, Google-Maps-ish but light on clutter
-const baseTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-  attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-  subdomains: 'abcd',
-  maxZoom: 20
+// Street-level basemap, free & keyless (CartoDB/CARTO now requires a paid API
+// key for their basemap tiles, so we use standard OpenStreetMap tiles instead).
+const baseTiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  subdomains: 'abc',
+  maxZoom: 19
 }).addTo(map);
 
 // Some embedded/sandboxed previews block external map-tile requests entirely.
@@ -1191,21 +1192,24 @@ function readSavedState(){
 
 function applySavedState(){
   const state = readSavedState();
-  if (!state || !CITIES[state.ville]) return;
-  if (state.ville !== currentCityKey) loadCity(state.ville);
-  if (state.metrique && CITIES[currentCityKey].metricKeys.includes(state.metrique)) {
-    currentMetric = state.metrique;
-  }
-  if (state.type) currentType = state.type;
-  if (state.pieces) currentPieces = state.pieces;
+  if (state && CITIES[state.ville]) {
+    if (state.ville !== currentCityKey) loadCity(state.ville);
+    if (state.metrique && CITIES[currentCityKey].metricKeys.includes(state.metrique)) {
+      currentMetric = state.metrique;
+    }
+    if (state.type) currentType = state.type;
+    if (state.pieces) currentPieces = state.pieces;
 
-  renderMetricChoices();
-  document.querySelectorAll('#typeChoice label').forEach(l => l.classList.toggle('active', l.dataset.type === currentType));
-  document.querySelectorAll('#typeChoice input').forEach(i => { i.checked = (i.value === currentType); });
-  document.querySelectorAll('#piecesChoice label').forEach(l => l.classList.toggle('active', l.dataset.pieces === currentPieces));
-  document.querySelectorAll('#piecesChoice input').forEach(i => { i.checked = (i.value === currentPieces); });
-  document.getElementById('typeFilterBlock').style.display = currentMetric === 'prix' ? 'block' : 'none';
-  document.getElementById('customWeightsBlock').style.display = currentMetric === 'custom' ? 'block' : 'none';
+    renderMetricChoices();
+    document.querySelectorAll('#typeChoice label').forEach(l => l.classList.toggle('active', l.dataset.type === currentType));
+    document.querySelectorAll('#typeChoice input').forEach(i => { i.checked = (i.value === currentType); });
+    document.querySelectorAll('#piecesChoice label').forEach(l => l.classList.toggle('active', l.dataset.pieces === currentPieces));
+    document.querySelectorAll('#piecesChoice input').forEach(i => { i.checked = (i.value === currentPieces); });
+    document.getElementById('typeFilterBlock').style.display = currentMetric === 'prix' ? 'block' : 'none';
+    document.getElementById('customWeightsBlock').style.display = currentMetric === 'custom' ? 'block' : 'none';
+  }
+  // Always render, whether or not a saved state was found — this is what
+  // paints the map on a first-ever visit with no history and no localStorage.
   refreshMap();
 }
 
@@ -1249,6 +1253,8 @@ document.getElementById('exportCsvBtn').addEventListener('click', exportCSV);
 
 document.getElementById('sourceNote').innerHTML = CITY_TEXT[currentCityKey].sourceNote;
 document.getElementById('freshnessNote').textContent = CITY_TEXT[currentCityKey].freshness;
+renderMetricChoices();
+renderWeightSliderLabels();
 applySavedState();
 </script>
 </body>
