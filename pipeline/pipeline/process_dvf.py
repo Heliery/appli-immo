@@ -12,6 +12,7 @@ Reprend exactement la méthode mise au point à la main pour Bordeaux et Dijon :
   marché (ventes/an/km²), évolution année sur année si assez de volume
 """
 from __future__ import annotations
+import math
 import statistics
 from collections import defaultdict
 from typing import Optional
@@ -52,10 +53,17 @@ def clean_mutations(raw_rows_by_insee: dict[str, list[dict]], years: list[str]) 
                 lat = float(r["latitude"])
             except (ValueError, TypeError, KeyError):
                 continue
+            # Certaines sources (le Parquet DVF notamment) stockent une donnée
+            # manquante comme un vrai NaN plutôt qu'une valeur vide : float("nan")
+            # ne lève PAS d'exception, et toute comparaison avec NaN (<, >, <=)
+            # renvoie toujours False, ce qui les laisserait passer silencieusement
+            # à travers les filtres suivants. On les écarte explicitement ici.
+            if any(math.isnan(v) for v in (valeur, surface, lon, lat)):
+                continue
             if surface < MIN_SURFACE or valeur <= 0:
                 continue
             prix_m2 = valeur / surface
-            if prix_m2 < MIN_PRIX_M2 or prix_m2 > MAX_PRIX_M2:
+            if not (MIN_PRIX_M2 <= prix_m2 <= MAX_PRIX_M2):
                 continue
             year = r["date_mutation"][:4]
             if year not in years:
