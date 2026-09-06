@@ -1,0 +1,43 @@
+name: Mise à jour de la carte immobilière
+
+on:
+  schedule:
+    # Tous les 1ers du mois à 6h du matin (UTC). Adapte la fréquence si besoin :
+    # les données DVF sortent environ tous les 3 mois, la sécurité 2x/an,
+    # les GTFS peuvent changer plus souvent. Une fois par mois est un bon défaut.
+    - cron: "0 6 1 * *"
+  workflow_dispatch: {}   # bouton "Run workflow" manuel dans l'onglet Actions
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer les dépendances
+        run: pip install -r requirements.txt
+
+      - name: Générer les données Bordeaux
+        run: python run_pipeline.py config/bordeaux.yaml
+
+      - name: Générer les données Dijon
+        run: python run_pipeline.py config/dijon.yaml
+
+      - name: Injecter dans le template et produire la carte
+        run: |
+          python inject_into_html.py template.html \
+            output/final_data_bordeaux.json \
+            output/final_data_dijon.json \
+            -o index.html
+
+      - name: Committer si le fichier a changé
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet && echo "Rien à committer" || git commit -m "Mise à jour automatique des données ($(date +%Y-%m-%d))"
+          git push
