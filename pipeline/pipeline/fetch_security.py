@@ -30,23 +30,36 @@ DEFAULT_INDICATORS = {
 
 def find_communal_csv_url() -> str:
     """Retrouve dynamiquement l'URL de la ressource "base communale" la plus
-    récente du jeu de données SSMSI (le nom de fichier change à chaque
-    publication, d'où l'appel API plutôt qu'une URL fixe)."""
+    récente du jeu de données SSMSI.
+
+    Les noms de fichiers ne contiennent PAS le mot "communale" (ce sont des
+    noms horodatés du type `donnee-data_gouv-2026-...csv.gz`), donc on ne
+    peut pas filtrer sur le titre. En revanche, sur les 3 bases publiées
+    (communale / départementale / régionale), seule la base communale est
+    assez volumineuse (~35 000 communes) pour être distribuée en `.csv.gz` —
+    les bases départementale et régionale, bien plus petites, sont
+    distribuées en `.csv` brut. C'est ce critère de format qu'on utilise.
+    """
     r = requests.get(DATAGOUV_API, timeout=30)
     r.raise_for_status()
     resources = r.json()["resources"]
-    candidates = [
-        res for res in resources
-        if "communale" in res["title"].lower() and res["format"] in ("csv", "gz")
-    ]
-    if not candidates:
+
+    gz_candidates = [res for res in resources if res["format"] == "csv.gz"]
+    if gz_candidates:
+        gz_candidates.sort(key=lambda r: r.get("last_modified", ""), reverse=True)
+        return gz_candidates[0]["url"]
+
+    # Repli : si le format a changé (plus de gzip), on prend le plus gros des
+    # fichiers csv, en supposant que c'est toujours la base communale qui
+    # domine largement les deux autres en volume.
+    csv_candidates = [res for res in resources if res["format"] == "csv"]
+    if not csv_candidates:
         raise ValueError(
-            "Ressource 'base communale' introuvable — vérifie manuellement sur "
-            f"https://www.data.gouv.fr/fr/datasets/{DATASET_ID}/"
+            "Aucune ressource csv/csv.gz trouvée — le format a peut-être "
+            f"changé, vérifie manuellement sur https://www.data.gouv.fr/fr/datasets/{DATASET_ID}/"
         )
-    # la plus récemment publiée en tête
-    candidates.sort(key=lambda r: r.get("last_modified", ""), reverse=True)
-    return candidates[0]["url"]
+    csv_candidates.sort(key=lambda r: r.get("filesize") or 0, reverse=True)
+    return csv_candidates[0]["url"]
 
 
 def download_security_data(insee_codes: set[str], year: str = "2025",
@@ -60,9 +73,10 @@ def download_security_data(insee_codes: set[str], year: str = "2025",
     r.raise_for_status()
 
     content = r.content
+    is_gzip = content[:2] == b"\x1f\x8b"  # magic bytes gzip, plus fiable que l'URL
     text_stream = (
         io.TextIOWrapper(gzip.GzipFile(fileobj=io.BytesIO(content)), encoding="utf-8")
-        if url.endswith(".gz") else io.StringIO(content.decode("utf-8"))
+        if is_gzip else io.StringIO(content.decode("utf-8"))
     )
 
     totals: dict[str, dict] = {}
@@ -71,8 +85,14 @@ def download_security_data(insee_codes: set[str], year: str = "2025",
         return float(s.replace(",", ".")) if s not in ("NA", "", None) else None
 
     reader = csv.DictReader(text_stream, delimiter=";")
+    codgeo_field = next((f for f in (reader.fieldnames or []) if f.startswith("CODGEO")), None)
+    if codgeo_field is None:
+        raise ValueError(
+            f"Colonne CODGEO_xxxx introuvable dans l'en-tête ({reader.fieldnames}) — "
+            "le format du fichier SSMSI a peut-être changé, vérifie à la main."
+        )
     for row in reader:
-        code = row.get("CODGEO_2026") or row.get("CODGEO")
+        code = row.get(codgeo_field)
         if code not in insee_codes or row.get("annee") != year or row.get("indicateur") not in indicators:
             continue
         nb = to_float(row.get("nombre")) or to_float(row.get("complement_info_nombre"))
