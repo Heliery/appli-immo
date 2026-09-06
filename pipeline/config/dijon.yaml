@@ -37,7 +37,7 @@ insee_codes:
 
 years: ["2024", "2025"]
 
-gtfs_search_term: "DiviaMobilites"
+gtfs_search_term: "Divia"
 
 centre_stop_names:
   - "République"
