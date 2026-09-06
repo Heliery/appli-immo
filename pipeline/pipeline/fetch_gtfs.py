@@ -9,10 +9,18 @@ Doc : https://transport.data.gouv.fr/api-docs
 """
 from __future__ import annotations
 import io
+import unicodedata
 import zipfile
 import requests
 
 CATALOG_URL = "https://transport.data.gouv.fr/api/datasets"
+
+
+def _normalize(s: str) -> str:
+    """Enlève les accents et met en minuscule, pour comparer 'divia' à
+    'DiviaMobilités' sans se faire piéger par un é/e non accordé."""
+    s = unicodedata.normalize("NFKD", s)
+    return "".join(c for c in s if not unicodedata.combining(c)).lower()
 
 
 def search_gtfs_dataset(search_term: str) -> dict:
@@ -24,11 +32,11 @@ def search_gtfs_dataset(search_term: str) -> dict:
     r.raise_for_status()
     datasets = r.json()
 
-    term = search_term.lower()
+    term = _normalize(search_term)
     matches = [
         d for d in datasets
         if d.get("type") == "public-transit"
-        and term in d.get("title", "").lower()
+        and term in _normalize(d.get("title", ""))
     ]
     if not matches:
         raise ValueError(
