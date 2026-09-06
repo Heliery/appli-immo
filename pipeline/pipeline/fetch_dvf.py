@@ -1,73 +1,73 @@
 """
 Téléchargement des ventes DVF (Demandes de Valeurs Foncières).
 
-Source : "geo-dvf" (Etalab / Christian Quest), qui republie chaque année les
-données DGFiP au format CSV géolocalisé, y compris pré-découpées PAR COMMUNE.
-C'est ce qui alimente app.dvf.etalab.gouv.fr — on va directement à la source
-plutôt que de cliquer sur le site.
+⚠️ Historique : la première version de ce module devinait des URLs de type
+`files.data.gouv.fr/geo-dvf/.../communes/{dept}/{insee}.csv.gz`, qui se sont
+révélées ne plus être le bon chemin (404 systématique en production). Cette
+version interroge à la place le fichier Parquet national officiel via DuckDB
+avec un simple SELECT, colonne par colonne identiques aux champs DVF
+habituels (id_mutation, valeur_fonciere, code_commune, nombre_pieces_...) —
+donc rien d'autre à changer dans le reste du pipeline.
 
-Page d'index (pour vérifier que les URLs n'ont pas changé) :
-  https://files.data.gouv.fr/geo-dvf/latest/csv/
-
-Pattern d'URL stable, un fichier par commune et par année :
-  https://files.data.gouv.fr/geo-dvf/latest/csv/{annee}/communes/{dept}/{insee}.csv.gz
-
-où {dept} est le code département sur 2 ou 3 caractères (ex: "21", "33", "971").
-
-⚠️ Avant une première utilisation en production, vérifie une fois à la main
-qu'une URL répond bien (ex: colle-la dans un navigateur) : ces projets
-communautaires changent rarement de structure mais ça arrive.
+DuckDB sait lire un Parquet distant par HTTP Range-Requests : il ne
+télécharge que les morceaux du fichier réellement nécessaires à la requête,
+pas le fichier entier (plusieurs Go pour la France entière).
 """
 from __future__ import annotations
-import csv
-import gzip
-import io
 import logging
 from collections import defaultdict
 
-import requests
+import duckdb
 
 logger = logging.getLogger(__name__)
 
-BASE_URL = "https://files.data.gouv.fr/geo-dvf/latest/csv"
+PARQUET_URL = "https://object.data.gouv.fr/dataeng-open/dvf.parquet"
+
+COLUMNS = [
+    "id_mutation", "date_mutation", "nature_mutation", "valeur_fonciere",
+    "code_commune", "nom_commune", "type_local", "surface_reelle_bati",
+    "nombre_pieces_principales", "longitude", "latitude",
+]
 
 
-def _dept_from_insee(insee: str) -> str:
-    """2A/2B pour la Corse, sinon les 2 premiers chiffres (3 pour les DROM)."""
-    if insee.startswith("97"):
-        return insee[:3]
-    if insee.startswith("2A") or insee.startswith("2B"):
-        return insee[:2]
-    return insee[:2]
-
-
-def download_commune_year(insee: str, year: str) -> list[dict]:
-    """Télécharge et parse le CSV DVF d'une commune pour une année donnée.
-    Retourne la liste des lignes brutes (dict), une ligne par lot/local comme
-    dans les exports habituels de app.dvf.etalab.gouv.fr (id_mutation à
-    regrouper ensuite, voir pipeline/process_dvf.py)."""
-    dept = _dept_from_insee(insee)
-    url = f"{BASE_URL}/{year}/communes/{dept}/{insee}.csv.gz"
-    r = requests.get(url, timeout=60)
-    if r.status_code == 404:
-        logger.warning("Pas de données DVF pour %s en %s (404, normal si aucune vente)", insee, year)
-        return []
-    r.raise_for_status()
-    with gzip.open(io.BytesIO(r.content), mode="rt", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _connection():
+    con = duckdb.connect()
+    con.execute("INSTALL httpfs; LOAD httpfs;")
+    return con
 
 
 def download_all(insee_codes: list[str], years: list[str]) -> dict[str, list[dict]]:
-    """Télécharge tout, regroupé par commune. Renvoie {insee: [lignes...]}."""
+    """Télécharge toutes les ventes des communes/années demandées en UNE
+    requête SQL, et les regroupe par commune : {insee: [lignes...]}.
+
+    Chaque colonne est explicitement castée en VARCHAR pour renvoyer des
+    lignes dont les valeurs sont des chaînes de caractères, exactement comme
+    le faisait l'ancien export CSV — process_dvf.clean_mutations() n'a donc
+    besoin d'aucune adaptation."""
+    con = _connection()
+    codes_sql = ", ".join(f"'{c}'" for c in insee_codes)
+    years_sql = ", ".join(str(int(y)) for y in years)
+    select_cols = ", ".join(f"CAST({c} AS VARCHAR) AS {c}" for c in COLUMNS)
+
+    query = f"""
+        SELECT {select_cols}
+        FROM read_parquet('{PARQUET_URL}')
+        WHERE code_commune IN ({codes_sql})
+          AND EXTRACT(year FROM date_mutation) IN ({years_sql})
+    """
+    logger.info("Requête DuckDB sur le Parquet national DVF (%d communes, années %s)...",
+                len(insee_codes), years)
+    rows = con.execute(query).fetchdf().to_dict("records")
+    logger.info("%d lignes DVF récupérées au total.", len(rows))
+
     out: dict[str, list[dict]] = defaultdict(list)
-    total = len(insee_codes) * len(years)
-    done = 0
+    for row in rows:
+        out[row["code_commune"]].append(row)
+
     for insee in insee_codes:
-        for year in years:
-            rows = download_commune_year(insee, year)
-            out[insee].extend(rows)
-            done += 1
-            logger.info("[%d/%d] %s %s : %d lignes", done, total, insee, year, len(rows))
+        if insee not in out:
+            logger.warning("Aucune vente DVF trouvée pour %s sur %s (normal si aucune vente).",
+                            insee, years)
     return dict(out)
 
 
@@ -81,4 +81,4 @@ if __name__ == "__main__":
     codes = sys.argv[2:]
     data = download_all(codes, years)
     for insee, rows in data.items():
-        print(insee, "->", len(rows), "lignes brutes")
+        print(insee, "->", len(rows), "lignes")
