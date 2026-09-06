@@ -1,0 +1,64 @@
+city_key: dijon
+city_label: "Dijon Métropole"
+
+insee_codes:
+  - "21231"  # Dijon
+  - "21003"  # Ahuy
+  - "21105"  # Bressey-sur-Tille
+  - "21106"  # Bretenière
+  - "21166"  # Chenôve
+  - "21171"  # Chevigny-Saint-Sauveur
+  - "21192"  # Corcelles-les-Monts
+  - "21223"  # Daix
+  - "21263"  # Fénay
+  - "21270"  # Flavignerot
+  - "21278"  # Fontaine-lès-Dijon
+  - "21315"  # Hauteville-lès-Dijon
+  - "21355"  # Longvic
+  - "21370"  # Magny-sur-Tille
+  - "21390"  # Marsannay-la-Côte
+  - "21452"  # Neuilly-Crimolois
+  - "21473"  # Ouges
+  - "21481"  # Perrigny-lès-Dijon
+  - "21485"  # Plombières-lès-Dijon
+  - "21515"  # Quetigny
+  - "21540"  # Saint-Apollinaire
+  - "21605"  # Sennecey-lès-Dijon
+  - "21617"  # Talant
+  # Villages "route des Grands Crus" ajoutés hors métropole
+  - "21217"  # Curley
+  - "21254"  # L'Étang-Vergy
+  - "21295"  # Gevrey-Chambertin
+  - "21464"  # Nuits-Saint-Georges
+  - "21132"  # Chambœuf
+  - "21625"  # Ternant
+  - "21523"  # Reulle-Vergy
+  - "21442"  # Morey-Saint-Denis
+
+years: ["2024", "2025"]
+
+gtfs_search_term: "DiviaMobilites"
+
+centre_stop_names:
+  - "République"
+  - "Grangier"
+  - "Darcy"
+  - "Square Darcy"
+  - "Gare SNCF"
+  - "DIJON Gare"
+  - "Henry Darcy"
+
+arrival_deadline: "08:45:00"
+max_bus_headway_minutes: 20
+
+quartiers_geojson: "data/quartiers_dijon.geojson"
+quartiers_name_field: "NOM"
+quartiers_insee_field: null   # ce fichier n'a que CODCOMM (voir README, cas particulier Dijon)
+
+region_hint: "Bourgogne-Franche-Comté"
+
+# Seuil minimal de ventes en dessous duquel un avertissement "échantillon
+# faible" est affiché plutôt que de masquer la zone (utile pour les tout
+# petits villages ruraux comme Curley).
+low_sample_threshold: 3
+min_sample_to_display: 1

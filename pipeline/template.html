@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bordeaux Métropole — Prix de l'immobilier &amp; accès aux transports</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root{
+    --ink:#241417;
+    --paper:#f6f1ea;
+    --paper-2:#efe7db;
+    --wine:#6d1f34;
+    --wine-dark:#4a1523;
+    --wine-light:#a3435c;
+    --line:#ded2bd;
+    --green:#2f7d4f;
+    --red:#b23b2e;
+    --gray:#b9ada0;
+    --font-serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--font-sans);
+    display:flex;
+    flex-direction:column;
+    min-height:100vh;
+  }
+  header{
+    padding:22px 32px 16px;
+    border-bottom:1px solid var(--line);
+    background:var(--paper);
+  }
+  .city-switcher{
+    display:flex;
+    gap:8px;
+    margin-bottom:14px;
+    flex-wrap:wrap;
+  }
+  .city-btn{
+    padding:7px 16px;
+    border:1px solid var(--line);
+    border-radius:20px;
+    background:var(--paper-2);
+    color:#5a4d47;
+    font-family:var(--font-sans);
+    font-size:13px;
+    font-weight:600;
+    cursor:pointer;
+    transition:background .15s ease, color .15s ease, border-color .15s ease;
+  }
+  .city-btn:hover{ border-color:var(--wine-light); }
+  .city-btn.active{
+    background:var(--wine-dark);
+    border-color:var(--wine-dark);
+    color:#f6f1ea;
+  }
+  header h1{
+    font-family:var(--font-serif);
+    font-weight:500;
+    font-size:26px;
+    margin:0 0 6px;
+    color:var(--wine-dark);
+    letter-spacing:0.2px;
+  }
+  header p{
+    margin:0;
+    font-size:13.5px;
+    color:#5a4d47;
+    max-width:720px;
+    line-height:1.5;
+  }
+  .app{
+    flex:1;
+    display:flex;
+    min-height:0;
+  }
+  .panel{
+    width:300px;
+    flex-shrink:0;
+    background:var(--paper-2);
+    border-right:1px solid var(--line);
+    padding:20px 20px 24px;
+    overflow-y:auto;
+  }
+  .panel h2{
+    font-size:11.5px;
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    color:var(--wine);
+    margin:0 0 10px;
+    font-weight:600;
+  }
+  .panel h2.spaced{ margin-top:22px; }
+  .choice{
+    display:flex;
+    flex-direction:column;
+    gap:7px;
+    margin-bottom:8px;
+  }
+  .choice label{
+    display:flex;
+    align-items:center;
+    gap:9px;
+    padding:9px 11px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    background:var(--paper);
+    cursor:pointer;
+    font-size:13.5px;
+    transition:border-color .15s ease, background .15s ease;
+  }
+  .choice label:hover{ border-color:var(--wine-light); }
+  .choice input{ accent-color:var(--wine); width:14px; height:14px; flex-shrink:0; }
+  .choice label.active{
+    border-color:var(--wine);
+    background:#fbf6ee;
+  }
+  .subtext{
+    font-size:11.5px;
+    color:#8a7c72;
+    margin:-2px 0 14px;
+    line-height:1.4;
+  }
+  #typeFilterBlock{ margin-bottom:4px; }
+  .transit-toggles label{
+    display:flex; align-items:center; gap:8px;
+    font-size:13px; padding:6px 4px; cursor:pointer;
+  }
+  .transit-toggles input{ accent-color:var(--wine); width:14px; height:14px; }
+  .swatch{
+    display:inline-block; width:20px; height:4px; border-radius:2px; flex-shrink:0;
+  }
+  .legend{ margin-bottom:6px; }
+  .legend-bar{
+    height:11px;
+    border-radius:6px;
+    background:linear-gradient(90deg, var(--green), #d8c98f 50%, var(--red));
+    margin-bottom:6px;
+  }
+  .legend-labels{
+    display:flex;
+    justify-content:space-between;
+    font-size:10.5px;
+    color:#5a4d47;
+  }
+  .legend-avg{
+    margin-top:9px;
+    font-size:12.5px;
+    color:var(--ink);
+  }
+  .legend-avg strong{ color:var(--wine-dark); }
+  .quartier-list{
+    display:flex;
+    flex-direction:column;
+    gap:1px;
+    max-height:340px;
+    overflow-y:auto;
+    margin-bottom:4px;
+  }
+  .qrow{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:6px 8px;
+    border-radius:5px;
+    font-size:12.5px;
+    cursor:pointer;
+    gap:8px;
+  }
+  .qrow:hover{ background:var(--paper); }
+  .qrow .dot{
+    width:8px;height:8px;border-radius:50%;
+    flex-shrink:0;
+  }
+  .qrow .name{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .qrow .commune{ color:#a89a8e; font-size:10.5px; }
+  .qrow .val{ font-variant-numeric:tabular-nums; color:#5a4d47; font-size:11.5px; flex-shrink:0; }
+  .source-note{
+    margin-top:20px;
+    padding-top:14px;
+    border-top:1px solid var(--line);
+    font-size:11px;
+    line-height:1.55;
+    color:#7a6d64;
+  }
+  .source-note b{ color:#5a4d47; }
+  .map-wrap{
+    flex:1;
+    position:relative;
+  }
+  #map{
+    position:absolute;
+    inset:0;
+    background:#e8e2d6;
+  }
+  .leaflet-popup-content-wrapper{
+    border-radius:8px;
+    font-family:var(--font-sans);
+  }
+  .popup-title{
+    font-family:var(--font-serif);
+    font-size:16px;
+    color:var(--wine-dark);
+    margin-bottom:2px;
+  }
+  .popup-sub{ font-size:11.5px; color:#8a7c72; margin-bottom:8px; }
+  .popup-row{ font-size:13px; margin:3px 0; display:flex; justify-content:space-between; gap:14px; }
+  .popup-row b{ color:var(--ink); font-weight:600; }
+  .popup-row .muted{ color:#a89a8e; }
+  .popup-divider{ border:none; border-top:1px solid var(--line); margin:8px 0; }
+  .no-data{ opacity:.55; font-style:italic; }
+  .low-sample-warning{
+    background:#fff3d6;
+    border:1px solid #e0b84a;
+    border-radius:5px;
+    padding:6px 8px;
+    font-size:11.5px;
+    color:#7a5c10;
+    line-height:1.4;
+    margin-bottom:8px;
+  }
+  .qrow .low-sample-flag{ color:#b8860b; font-size:11px; margin-left:2px; }
+  .slider-row{ margin-bottom:12px; }
+  .slider-label{
+    display:flex; justify-content:space-between;
+    font-size:12.5px; color:#5a4d47; margin-bottom:4px;
+  }
+  .slider-label span:last-child{ font-variant-numeric:tabular-nums; color:var(--wine-dark); font-weight:600; }
+  .slider-row input[type=range]{
+    width:100%; accent-color:var(--wine); cursor:pointer;
+  }
+  .search-input{
+    width:100%;
+    padding:8px 10px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    background:var(--paper);
+    font-size:13px;
+    font-family:var(--font-sans);
+    margin-bottom:8px;
+  }
+  .search-input:focus{ outline:none; border-color:var(--wine); }
+  .qrow .compare-cb{ accent-color:var(--wine); width:13px; height:13px; flex-shrink:0; cursor:pointer; }
+  .compare-panel{
+    margin-top:14px;
+    padding-top:12px;
+    border-top:1px solid var(--line);
+    overflow-x:auto;
+  }
+  .compare-table{
+    border-collapse:collapse;
+    font-size:11.5px;
+    width:100%;
+  }
+  .compare-table th, .compare-table td{
+    padding:5px 8px;
+    text-align:left;
+    border-bottom:1px solid var(--line);
+    white-space:nowrap;
+  }
+  .compare-table th{
+    font-weight:600;
+    color:var(--wine-dark);
+    position:relative;
+  }
+  .compare-table td:first-child, .compare-table th:first-child{
+    color:#8a7c72; font-weight:400; white-space:normal;
+  }
+  .compare-remove{
+    background:none; border:none; color:#a89a8e; cursor:pointer;
+    font-size:13px; margin-left:6px; padding:0 2px;
+  }
+  .compare-remove:hover{ color:var(--wine); }
+  .export-btn{
+    display:block;
+    width:100%;
+    margin-top:10px;
+    padding:8px 10px;
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:6px;
+    color:var(--wine-dark);
+    font-family:var(--font-sans);
+    font-size:12.5px;
+    font-weight:600;
+    cursor:pointer;
+    transition:border-color .15s ease, background .15s ease;
+  }
+  .export-btn:hover{ border-color:var(--wine-light); background:#fbf6ee; }
+  .export-btn.copied{ background:#e8f2ea; border-color:var(--green); color:var(--green); }
+  .freshness-note{
+    margin-top:10px;
+    font-size:10.5px;
+    color:#a89a8e;
+    line-height:1.5;
+  }
+
+  /* ---------- Responsive (mobile / tablette) ---------- */
+  .filter-toggle-btn{
+    display:none;
+    position:absolute;
+    top:12px; left:12px;
+    z-index:1100;
+    align-items:center;
+    gap:6px;
+    padding:9px 14px;
+    background:var(--wine-dark);
+    color:#f6f1ea;
+    border:none;
+    border-radius:20px;
+    font-family:var(--font-sans);
+    font-size:13px;
+    font-weight:600;
+    cursor:pointer;
+    box-shadow:0 2px 8px rgba(0,0,0,.25);
+  }
+  .panel-close-btn{
+    display:none;
+    position:absolute;
+    top:10px; right:10px;
+    width:30px; height:30px;
+    border:none;
+    border-radius:50%;
+    background:var(--paper);
+    color:var(--wine-dark);
+    font-size:18px;
+    line-height:1;
+    cursor:pointer;
+    box-shadow:0 1px 4px rgba(0,0,0,.15);
+  }
+  #panelBackdrop{
+    display:none;
+    position:fixed; inset:0;
+    background:rgba(36,20,23,.4);
+    z-index:1150;
+  }
+
+  @media (max-width: 820px){
+    header{ padding:14px 16px 12px; }
+    header h1{ font-size:19px; }
+    header p{ font-size:12.5px; }
+    .app{ position:relative; overflow:hidden; }
+    .panel{
+      position:fixed;
+      top:0; left:0; bottom:0;
+      width:min(320px, 86vw);
+      z-index:1200;
+      transform:translateX(-105%);
+      transition:transform .25s ease;
+      box-shadow:3px 0 16px rgba(0,0,0,.3);
+    }
+    .panel.open{ transform:translateX(0); }
+    .panel-close-btn{ display:block; }
+    .city-switcher{ margin-top:26px; }
+    .city-btn{ font-size:12px; padding:6px 12px; }
+    .filter-toggle-btn{ display:flex; }
+    #panelBackdrop.open{ display:block; }
+    .map-wrap{ width:100%; }
+    .legend-avg, .subtext{ font-size:12px; }
+    .quartier-list{ max-height:38vh; }
+  }
+
+  @media (max-width: 480px){
+    header h1{ font-size:17px; }
+    header p{ display:none; }
+    .panel{ width:88vw; padding:18px 16px 20px; }
+    .popup-title{ font-size:14px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1 id="headerTitle">Bordeaux Métropole — immobilier &amp; transports</h1>
+  <p id="headerDesc">Prix médians au m² calculés à partir des mutations DVF (DGFiP, ventes 2024–2025) pour les 28 communes de Bordeaux Métropole, croisés avec le réseau de transport en commun TBM (bus, tram, navettes fluviales). Vert = plus favorable que la médiane, rouge = moins favorable.</p>
+</header>
+
+<div class="app">
+  <div id="panelBackdrop"></div>
+  <div class="panel">
+    <button id="panelCloseBtn" class="panel-close-btn" aria-label="Fermer">×</button>
+    <div class="city-switcher" id="citySwitcher">
+      <button class="city-btn active" data-city="bordeaux">Bordeaux Métropole</button>
+      <button class="city-btn" data-city="dijon">Dijon Métropole</button>
+    </div>
+    <button id="shareLinkBtn" class="export-btn" style="margin-bottom:16px;">🔗 Copier le lien de cette vue</button>
+    <h2>Carte affichée</h2>
+    <div class="choice" id="metricChoice"></div>
+
+    <div id="customWeightsBlock" style="display:none;">
+      <h2 class="spaced">Pondération</h2>
+      <div id="weightSliders"></div>
+      <div class="subtext">Les curseurs sont normalisés automatiquement (leur somme fait 100% du score).</div>
+    </div>
+
+    <div id="typeFilterBlock">
+      <h2 class="spaced">Type de bien</h2>
+      <div class="choice" id="typeChoice">
+        <label class="active" data-type="tous">
+          <input type="radio" name="typebien" value="tous" checked>
+          Tous
+        </label>
+        <label data-type="appartement">
+          <input type="radio" name="typebien" value="appartement">
+          Appartement
+        </label>
+        <label data-type="maison">
+          <input type="radio" name="typebien" value="maison">
+          Maison
+        </label>
+      </div>
+
+      <h2 class="spaced">Nombre de pièces</h2>
+      <div class="choice" id="piecesChoice">
+        <label class="active" data-pieces="tous">
+          <input type="radio" name="pieces" value="tous" checked>
+          Toutes
+        </label>
+        <label data-pieces="1p">
+          <input type="radio" name="pieces" value="1p">
+          1 pièce
+        </label>
+        <label data-pieces="2p">
+          <input type="radio" name="pieces" value="2p">
+          2 pièces
+        </label>
+        <label data-pieces="3p">
+          <input type="radio" name="pieces" value="3p">
+          3 pièces
+        </label>
+        <label data-pieces="4p">
+          <input type="radio" name="pieces" value="4p">
+          4 pièces et +
+        </label>
+      </div>
+    </div>
+
+    <div id="transitSection">
+    <h2 class="spaced">Réseau TBM</h2>
+    <div class="transit-toggles" id="transitToggles">
+      <label><input type="checkbox" id="toggleTram" checked><span class="swatch" style="background:#a3435c"></span>Tramway (A–F)</label>
+      <label><input type="checkbox" id="toggleBus"><span class="swatch" style="background:#00B1EB"></span>Bus &amp; Lianes</label>
+      <label><input type="checkbox" id="toggleBoat"><span class="swatch" style="background:#2f7d4f"></span>Navettes fluviales (Bat³)</label>
+    </div>
+    <div class="subtext">Les lignes et arrêts s'affichent en cochant chaque catégorie. Les arrêts individuels (tram et bus) n'apparaissent qu'à partir d'un zoom rapproché, pour rester lisibles.</div>
+    </div>
+
+    <h2 class="spaced">Légende</h2>
+    <div class="legend">
+      <div class="legend-bar"></div>
+      <div class="legend-labels">
+        <span id="legendMin">—</span>
+        <span id="legendMax">—</span>
+      </div>
+      <div class="legend-avg">Médiane <span id="legendCityWord">métropole</span> : <strong id="avgValue">—</strong></div>
+    </div>
+
+    <h2 class="spaced">Zones (<span id="zoneCount">0</span>)</h2>
+    <input type="text" id="zoneSearch" class="search-input" placeholder="Rechercher un quartier, une commune…">
+    <div class="subtext" style="margin-top:0;">Cochez jusqu'à 3 zones pour les comparer côte à côte.</div>
+    <div class="quartier-list" id="quartierList"></div>
+    <button id="exportCsvBtn" class="export-btn">⬇ Exporter cette vue en CSV</button>
+
+    <div id="comparePanel" class="compare-panel" style="display:none;"></div>
+
+    <div class="source-note" id="sourceNote"></div>
+    <div class="freshness-note" id="freshnessNote"></div>
+  </div>
+
+  <div class="map-wrap">
+    <button id="filterToggleBtn" class="filter-toggle-btn">☰ Filtres &amp; légende</button>
+    <div id="map"></div>
+  </div>
+</div>
+
+<script>
+const DATA_BORDEAUX = __DATA_JSON_BORDEAUX__;
+const DATA_DIJON = __DATA_JSON_DIJON__;
+
+const CITY_TEXT = {
+  bordeaux: {
+    title: "Bordeaux Métropole — immobilier &amp; transports",
+    desc: "Prix médians au m² calculés à partir des mutations DVF (DGFiP, ventes 2024–2025) pour les 28 communes de Bordeaux Métropole, croisés avec le réseau de transport en commun TBM (bus, tram, navettes fluviales). Vert = plus favorable que la médiane, rouge = moins favorable.",
+    legendWord: "métropole",
+    freshness: "Ventes DVF : 2024–2025 · Sécurité SSMSI : 2025 · Réseau TBM : horaires en vigueur 2026.",
+    sourceNote: `
+      <b>Méthode :</b> médiane du prix/m² calculée sur les ventes simples (un seul bien principal par mutation), hors valeurs aberrantes. Zones avec moins de 3 ventes exploitables non affichées ; combinaison type de bien × nombre de pièces affichée uniquement si ≥3 ventes correspondantes. Le score de transport pondère les arrêts par nombre de lignes et présence du tram, rapporté à la surface de la zone (arrêts/km²). Le dynamisme du marché est le nombre de ventes par an rapporté à la surface (ventes/an/km²) — indicateur de liquidité, pas de qualité du quartier. Le temps vers le centre-ville (*) est calculé depuis l'arrêt TBM le mieux connecté proche de chaque zone, pour un trajet arrivant vers 8h45 un mercredi type — hors temps de marche et sans modéliser les correspondances piétonnes entre arrêts proches mais distincts ; à prendre comme ordre de grandeur. La sécurité (*) additionne 10 indicateurs SSMSI 2025 pertinents pour un choix de logement (cambriolages, vols, dégradations, violences hors cadre familial et sexuelles — les violences intrafamiliales sont exclues car elles ne reflètent pas un risque de quartier), rapportés à la population résidente de la commune ; <u>elle n'est disponible qu'au niveau communal</u>, donc tous les quartiers d'une même commune affichent la même valeur. Attention : les taux rapportés à la population résidente surestiment mécaniquement les villes-centres (Bordeaux) où une population de passage (travailleurs, sorties, tourisme) commet ou subit des faits sans être comptée au dénominateur. Le mode « Sur mesure » combine le classement (percentile) de chaque zone sur prix / transport / temps selon vos pondérations, plutôt que les valeurs brutes. Les couleurs de toutes les cartes reflètent le rang de chaque zone (percentile) plutôt qu'une échelle linéaire min/max, pour mieux distinguer les nuances quand une valeur extrême écraserait l'échelle. Découpage en quartiers officiels de Bordeaux Métropole (secteurs) là où disponible, sinon commune entière.<br><br>
+      <b>Sources :</b> DVF (DGFiP), contours <em>se_quart_s</em> / <em>fv_commu_s</em> (Bordeaux Métropole, open data), GTFS TBM, SSMSI (délinquance communale 2025).`,
+  },
+  dijon: {
+    title: "Dijon Métropole — immobilier &amp; transports",
+    desc: "Prix médians au m² calculés à partir des mutations DVF (DGFiP, ventes 2024–2025) pour les 23 communes de Dijon Métropole ainsi que Gevrey-Chambertin, Nuits-Saint-Georges, Curley, Chambœuf et L'Étang-Vergy (route des Grands Crus), croisés avec le réseau de transport en commun DiviaMobilités (bus, tram T1/T2). Vert = plus favorable que la médiane, rouge = moins favorable.",
+    legendWord: "métropole",
+    freshness: "Ventes DVF : 2024–2025 · Sécurité SSMSI : 2025 · Réseau DiviaMobilités : horaires en vigueur été/automne 2026.",
+    sourceNote: `
+      <b>Méthode :</b> médiane du prix/m² calculée sur les ventes simples (un seul bien principal par mutation), hors valeurs aberrantes. Zones avec moins de 3 ventes exploitables non affichées ; combinaison type de bien × nombre de pièces affichée uniquement si ≥3 ventes correspondantes. Le score de transport pondère les arrêts par nombre de lignes et présence du tram, rapporté à la surface de la zone (arrêts/km²). Le dynamisme du marché est le nombre de ventes par an rapporté à la surface (ventes/an/km²) — indicateur de liquidité, pas de qualité du quartier. Le temps vers le centre-ville (*) est calculé depuis l'arrêt DiviaMobilités le mieux connecté proche de chaque zone, pour un trajet arrivant vers 8h45 un mercredi type — hors temps de marche et sans modéliser les correspondances piétonnes entre arrêts proches mais distincts ; à prendre comme ordre de grandeur. La sécurité (*) additionne 10 indicateurs SSMSI 2025 pertinents pour un choix de logement, rapportés à la population résidente de la commune ; <u>elle n'est disponible qu'au niveau communal</u>. Attention : les taux rapportés à la population résidente surestiment mécaniquement les villes-centres (Dijon). Le mode « Sur mesure » combine le classement (percentile) de chaque zone sur prix / transport / temps selon vos pondérations. Découpage en quartiers officiels de Dijon (9 quartiers) là où disponible, sinon commune entière.<br><br>
+      <b>Encore à venir :</b> risques naturels (retrait-gonflement des argiles, zones inondables). Les très petits villages de la route des Grands Crus (Curley, Ternant, Reulle-Vergy) affichent un prix malgré 1 à 2 ventes seulement sur 2024–2025 — un bandeau ⚠ le rappelle systématiquement dans leur fiche et devant leur nom dans la liste ; à ne surtout pas comparer directement avec les zones urbaines qui reposent sur des dizaines ou centaines de ventes.<br><br>
+      <b>Sources :</b> DVF (DGFiP), DVF+ (Cerema, région Bourgogne-Franche-Comté — pour Gevrey-Chambertin, Nuits-Saint-Georges, Curley, Chambœuf, L'Étang-Vergy), contours quartiers Dijon et communes (Dijon Métropole / France GeoJSON, open data), GTFS DiviaMobilités, SSMSI (délinquance communale 2025). Le filtre « nombre de pièces » ne s'applique pas aux 5 communes de la route des Grands Crus (donnée absente de l'export DVF+ utilisé).`,
+  }
+};
+
+const CITIES = {
+  bordeaux: {
+    zones: DATA_BORDEAUX.zones,
+    globalMedian: DATA_BORDEAUX.global_median,
+    transit: DATA_BORDEAUX.transit,
+    stops: DATA_BORDEAUX.stops,
+    hasTransit: true,
+    metricKeys: ['prix', 'transport', 'temps', 'dynamisme', 'securite', 'custom'],
+    customDims: ['prix', 'transport', 'temps', 'dynamisme', 'securite'],
+  },
+  dijon: {
+    zones: DATA_DIJON.zones,
+    globalMedian: DATA_DIJON.global_median,
+    transit: DATA_DIJON.transit,
+    stops: DATA_DIJON.stops,
+    hasTransit: true,
+    metricKeys: ['prix', 'transport', 'temps', 'dynamisme', 'securite', 'custom'],
+    customDims: ['prix', 'transport', 'temps', 'dynamisme', 'securite'],
+  }
+};
+
+let currentCityKey = 'bordeaux';
+let zonesFC = CITIES[currentCityKey].zones;
+let transitRoutes = CITIES[currentCityKey].transit;
+let stopsData = CITIES[currentCityKey].stops;
+
+// ---------- map setup ----------
+const map = L.map('map', { scrollWheelZoom:true, preferCanvas: true });
+
+// Street-level basemap, free & keyless. Both CartoDB (needs a paid API key now)
+// and standard OpenStreetMap tiles (block requests with no Referer header —
+// which is exactly what happens when this file is opened locally via file://)
+// are unreliable for a standalone HTML file. Esri's World Street Map tiles are
+// free, keyless, and don't enforce a Referer check, so they work the same way
+// whether this file is opened locally or hosted online.
+const baseTiles = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+  attribution: 'Tiles &copy; Esri &mdash; Source: Esri, HERE, Garmin, USGS, Intermap, INCREMENT P, NRCan, Esri Japan, METI, Esri China (Hong Kong), Esri Korea, Esri (Thailand), NGCC, &copy; OpenStreetMap contributors, and the GIS User Community',
+  maxZoom: 19
+}).addTo(map);
+
+// Some embedded/sandboxed previews block external map-tile requests entirely.
+// Detect that case and tell the person how to fix it, instead of silently
+// showing a flat, street-less map.
+let tilesLoadedOK = 0;
+baseTiles.on('tileload', () => { tilesLoadedOK++; });
+setTimeout(() => {
+  if (tilesLoadedOK === 0) {
+    const warn = document.createElement('div');
+    warn.style.cssText = 'position:absolute;bottom:14px;left:14px;right:14px;background:#fff8ec;border:1px solid #d9c9a8;border-radius:8px;padding:11px 15px;font-size:12.5px;line-height:1.5;color:#5a4d47;z-index:1000;box-shadow:0 2px 8px rgba(0,0,0,.18);';
+    warn.innerHTML = '<b>Le fond de carte (rues, noms de lieux) ne s\'affiche pas ici.</b> Cet aperçu intégré bloque probablement le chargement des tuiles cartographiques externes. Téléchargez le fichier puis ouvrez-le directement dans votre navigateur (double-clic) pour un rendu complet avec les rues.';
+    document.querySelector('.map-wrap').appendChild(warn);
+  }
+}, 4000);
+
+function fitToZones(){
+  const b = [];
+  zonesFC.features.forEach(f => {
+    f.geometry.coordinates[0].forEach(([lon, lat]) => b.push([lat, lon]));
+  });
+  map.fitBounds(b, { padding: [10, 10] });
+}
+fitToZones();
+
+// ---------- color helpers ----------
+function hexToRgb(hex){
+  const v = hex.replace('#','');
+  return { r: parseInt(v.substring(0,2),16), g: parseInt(v.substring(2,4),16), b: parseInt(v.substring(4,6),16) };
+}
+function mix(hex1, hex2, t){
+  const c1 = hexToRgb(hex1), c2 = hexToRgb(hex2);
+  const r = Math.round(c1.r + (c2.r-c1.r)*t);
+  const g = Math.round(c1.g + (c2.g-c1.g)*t);
+  const b = Math.round(c1.b + (c2.b-c1.b)*t);
+  return `rgb(${r},${g},${b})`;
+}
+function colorFor(value, min, avg, max, invert){
+  if (value === null || value === undefined) return '#d9d2c6';
+  let lowColor = '#2f7d4f', highColor = '#b23b2e';
+  if (invert) { [lowColor, highColor] = [highColor, lowColor]; }
+  let t;
+  if (value <= avg) {
+    t = (avg - min) > 0 ? (value - min) / (avg - min) : 0.5;
+    t = Math.max(0, Math.min(1, t));
+    return mix(lowColor, '#d8c98f', t);
+  } else {
+    t = (max - avg) > 0 ? (value - avg) / (max - avg) : 0.5;
+    t = Math.max(0, Math.min(1, t));
+    return mix('#d8c98f', highColor, t);
+  }
+}
+
+// Rank/percentile-based coloring: color reflects each zone's relative position
+// among currently displayed zones rather than raw distance from min/max, so a
+// single extreme zone doesn't wash out the nuance between all the others.
+function buildRankMap(pairs){
+  // pairs: [ [id, value], ... ] where a HIGHER value always means "better/greener"
+  const valid = pairs.filter(([, v]) => v !== null && v !== undefined && !isNaN(v));
+  const sortedVals = valid.map(([, v]) => v).slice().sort((a, b) => a - b);
+  const n = sortedVals.length;
+  const map = new Map();
+  valid.forEach(([id, v]) => {
+    let countLE = 0;
+    for (const x of sortedVals) if (x <= v) countLE++;
+    map.set(id, n > 1 ? (countLE - 0.5) / n : 0.5);
+  });
+  return map;
+}
+function goodnessToColor(rank){
+  if (rank === null || rank === undefined) return '#d9d2c6';
+  if (rank >= 0.5) return mix('#d8c98f', '#2f7d4f', (rank - 0.5) / 0.5);
+  return mix('#b23b2e', '#d8c98f', rank / 0.5);
+}
+
+// ---------- metric definitions ----------
+const metrics = {
+  prix: {
+    label: 'Prix au m²',
+    format: v => v === null || v === undefined ? 'données insuff.' : Math.round(v).toLocaleString('fr-FR') + ' €/m²',
+    legendMin: 'moins cher',
+    legendMax: 'plus cher',
+  },
+  transport: {
+    label: 'Accès aux transports',
+    getValue: (p) => p.transport_score,
+    format: v => v === null || v === undefined ? 'n/d' : v.toFixed(1) + ' pts/km²',
+    legendMin: 'moins desservi',
+    legendMax: 'mieux desservi',
+  },
+  temps: {
+    label: 'Temps vers le centre-ville',
+    getValue: (p) => p.temps_centre_min,
+    format: v => {
+      if (v === null || v === undefined) return 'n/d';
+      if (v < 60) return Math.round(v) + ' min';
+      const h = Math.floor(v / 60), m = Math.round(v % 60);
+      return `${h}h${String(m).padStart(2, '0')}`;
+    },
+    legendMin: 'proche du centre',
+    legendMax: 'loin du centre',
+  },
+  dynamisme: {
+    label: 'Dynamisme du marché',
+    getValue: (p) => p.dynamisme,
+    format: v => v === null || v === undefined ? 'n/d' : Math.round(v).toLocaleString('fr-FR') + ' ventes/an/km²',
+    legendMin: 'marché calme',
+    legendMax: 'marché dynamique',
+  },
+  securite: {
+    label: 'Sécurité',
+    getValue: (p) => p.securite_taux,
+    format: v => v === null || v === undefined ? 'n/d' : v.toFixed(1) + ' faits/1000 hab.',
+    legendMin: 'plus sûr',
+    legendMax: 'moins sûr',
+  },
+  custom: {
+    label: 'Sur mesure (pondéré)',
+    format: v => v === null || v === undefined ? 'n/d' : v.toFixed(0) + '/100',
+    legendMin: 'profil moins adapté',
+    legendMax: 'profil recherché',
+  }
+};
+
+let currentMetric = 'prix';
+let currentType = 'tous';
+let currentPieces = 'tous';
+let customScores = new Map(); // zid -> 0..100, recomputed when metric is 'custom'
+let currentRankMap = new Map(); // zid -> 0..1 goodness rank for the active metric
+
+const METRIC_SIGN = { prix: -1, transport: 1, temps: -1, dynamisme: 1, securite: -1 };
+
+function readWeights(){
+  const dims = CITIES[currentCityKey].customDims;
+  const raw = dims.map((_, i) => parseFloat(document.getElementById('weight-slider-' + i).value) || 0);
+  const sum = raw.reduce((a, b) => a + b, 0) || 1;
+  return raw.map(v => v / sum);
+}
+
+function recomputeCustomScores(){
+  const dims = CITIES[currentCityKey].customDims;
+  const w = readWeights();
+  const filterKey = `${currentType}|${currentPieces}`;
+  const rankMaps = dims.map(dim => buildRankMap(zonesFC.features.map(f => {
+    let raw;
+    if (dim === 'prix') {
+      const entry = f.properties.prix_par_filtre[filterKey];
+      raw = entry ? entry.prix : null;
+    } else {
+      raw = metrics[dim].getValue(f.properties);
+    }
+    if (raw === null || raw === undefined) return [f.properties.id, null];
+    return [f.properties.id, METRIC_SIGN[dim] * raw];
+  })));
+  customScores = new Map();
+  zonesFC.features.forEach(f => {
+    const id = f.properties.id;
+    let score = 0;
+    dims.forEach((dim, i) => {
+      const r = rankMaps[i].has(id) ? rankMaps[i].get(id) : 0.5;
+      score += w[i] * r;
+    });
+    customScores.set(id, 100 * score);
+  });
+}
+
+function currentValueOf(props){
+  if (currentMetric === 'prix') {
+    const entry = props.prix_par_filtre[`${currentType}|${currentPieces}`];
+    return entry ? entry.prix : null;
+  }
+  if (currentMetric === 'custom') {
+    return customScores.has(props.id) ? customScores.get(props.id) : null;
+  }
+  return metrics[currentMetric].getValue(props);
+}
+
+// sign-adjusted value used purely for ranking: higher must always mean "better/greener"
+function rankableValue(props){
+  const v = currentValueOf(props);
+  if (v === null || v === undefined) return null;
+  if (currentMetric === 'prix' || currentMetric === 'temps' || currentMetric === 'securite') return -v;
+  return v;
+}
+
+// ---------- zone layer ----------
+let zoneLayer = null;
+const layerByZoneId = {};
+
+function currentZoneOpacity(){
+  const z = map.getZoom();
+  if (z >= 16) return 0.16;
+  if (z >= 15) return 0.28;
+  if (z >= 14) return 0.40;
+  return 0.5;
+}
+
+function styleForFeature(feature){
+  const rank = currentRankMap.has(feature.properties.id) ? currentRankMap.get(feature.properties.id) : null;
+  return {
+    fillColor: goodnessToColor(rank),
+    fillOpacity: currentZoneOpacity(),
+    color: '#3a2e2a',
+    weight: 1,
+    opacity: 0.4,
+  };
+}
+
+function extraMetricRows(props){
+  const keys = CITIES[currentCityKey].metricKeys.filter(k => k !== 'prix' && k !== 'custom');
+  let html = keys.map(k => {
+    const val = metrics[k].getValue(props);
+    return `<div class="popup-row"><span>${metrics[k].label}</span><b>${metrics[k].format(val)}</b></div>`;
+  }).join('');
+  if (CITIES[currentCityKey].hasTransit) {
+    html += `<div class="popup-row"><span>Arrêts TBM dans la zone</span><b>${props.n_stops}</b></div>`;
+  }
+  return html;
+}
+
+function popupContentFor(props){
+  const evolRow = (props.evolution !== null && props.evolution !== undefined)
+    ? `<div class="popup-row"><span>Évolution 2024→2025</span><b>${(props.evolution>0?'+':'')}${props.evolution.toFixed(1)}%</b></div>`
+    : '';
+  const rowPrix = (label, val, n) => {
+    if (val === null || val === undefined) {
+      return `<div class="popup-row no-data"><span>${label}</span><span>données insuffisantes</span></div>`;
+    }
+    return `<div class="popup-row"><span>${label} <span class="muted">(${n})</span></span><b>${Math.round(val).toLocaleString('fr-FR')} €/m²</b></div>`;
+  };
+  const piecesLabels = { tous: 'toutes tailles', '1p': '1 pièce', '2p': '2 pièces', '3p': '3 pièces', '4p': '4 pièces et +' };
+  const typeLabels = { tous: 'tous biens', appartement: 'appartement', maison: 'maison' };
+  let filterRow = '';
+  if (currentType !== 'tous' || currentPieces !== 'tous') {
+    const entry = props.prix_par_filtre[`${currentType}|${currentPieces}`];
+    const label = `Filtre actuel (${typeLabels[currentType]}, ${piecesLabels[currentPieces]})`;
+    filterRow = (entry && entry.prix !== null)
+      ? `<div class="popup-row"><span>${label} <span class="muted">(${entry.n})</span></span><b>${entry.prix.toLocaleString('fr-FR')} €/m²</b></div>`
+      : `<div class="popup-row no-data"><span>${label}</span><span>données insuffisantes</span></div>`;
+  }
+  const lowSampleWarning = props.low_sample
+    ? `<div class="low-sample-warning">⚠ Échantillon très faible (${props.n} vente${props.n > 1 ? 's' : ''} sur 2024–2025) — prix à interpréter avec beaucoup de prudence.</div>`
+    : '';
+  return `
+    <div class="popup-title">${props.name}</div>
+    <div class="popup-sub">${props.commune}${props.kind === 'commune' ? ' · commune entière' : ' · quartier'} — ${props.n} ventes analysées</div>
+    ${lowSampleWarning}
+    ${rowPrix('Tous biens', props.prix_tous, props.n)}
+    ${rowPrix('Appartement', props.prix_appartement, props.n_appartement)}
+    ${rowPrix('Maison', props.prix_maison, props.n_maison)}
+    ${filterRow}
+    ${evolRow}
+    <hr class="popup-divider">
+    ${extraMetricRows(props)}
+  `;
+}
+
+function buildZoneLayer(){
+  if (zoneLayer) { map.removeLayer(zoneLayer); }
+  for (const k in layerByZoneId) delete layerByZoneId[k];
+  zoneLayer = L.geoJSON(zonesFC, {
+    style: styleForFeature,
+    onEachFeature: (feature, layer) => {
+      layer.bindPopup(popupContentFor(feature.properties));
+      layer.on('mouseover', function(){ this.setStyle({ fillOpacity: 0.78, weight: 2, opacity: 0.8 }); });
+      layer.on('mouseout', function(){ zoneLayer.resetStyle(this); });
+      layerByZoneId[feature.properties.id] = layer;
+    }
+  }).addTo(map);
+}
+buildZoneLayer();
+
+// ---------- transit layer ----------
+let transitLayers = { tram: [], bus: [], boat: [] };
+let stopLayers = { tram: [], bus: [], boat: [] };
+
+const stopStyle = {
+  tram: { radius: 4,   color: '#ffffff', weight: 1.2, fillColor: '#6d1f34', fillOpacity: 0.9 },
+  bus:  { radius: 2.2, color: '#ffffff', weight: 0.6, fillColor: '#0090c2', fillOpacity: 0.55 },
+  boat: { radius: 4.5, color: '#ffffff', weight: 1.5, fillColor: '#2f7d4f', fillOpacity: 0.95 },
+};
+const MIN_ZOOM_STOPS = { tram: 13, bus: 15 }; // bus & tram stops only appear once zoomed in enough
+
+function labelFor(kind){
+  return kind === 'tram' ? 'Arrêt tram' : (kind === 'boat' ? 'Escale navette' : 'Arrêt bus');
+}
+
+function clearTransitAndStops(){
+  ['tram', 'bus', 'boat'].forEach(kind => {
+    transitLayers[kind].forEach(l => map.removeLayer(l));
+    stopLayers[kind].forEach(l => map.removeLayer(l));
+  });
+  transitLayers = { tram: [], bus: [], boat: [] };
+  stopLayers = { tram: [], bus: [], boat: [] };
+}
+
+function buildTransitAndStops(){
+  transitRoutes.forEach(route => {
+    const weight = route.kind === 'tram' ? 4 : (route.kind === 'boat' ? 3 : 2);
+    const opacity = route.kind === 'tram' ? 0.9 : (route.kind === 'boat' ? 0.85 : 0.55);
+    route.lines.forEach(line => {
+      const poly = L.polyline(line, {
+        color: route.color,
+        weight: weight,
+        opacity: opacity,
+        lineCap: 'round',
+      });
+      poly.bindTooltip(`${route.kind === 'tram' ? 'Tram ' : (route.kind === 'boat' ? 'Navette ' : 'Ligne ')}${route.name}${route.long_name && route.long_name !== route.name ? ' — ' + route.long_name : ''}`, { sticky: true });
+      transitLayers[route.kind].push(poly);
+    });
+  });
+
+  stopsData.forEach(stop => {
+    ['tram', 'bus', 'boat'].forEach(kind => {
+      if (!stop[kind]) return;
+      const marker = L.circleMarker([stop.lat, stop.lon], stopStyle[kind]);
+      marker.bindTooltip(
+        `<b>${stop.name}</b><br>${labelFor(kind)} — ${stop.lines.join(', ')}`,
+        { direction: 'top', offset: [0, -4] }
+      );
+      stopLayers[kind].push(marker);
+    });
+  });
+}
+buildTransitAndStops();
+
+function capitalize(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
+
+function updateTransitVisibility(){
+  const zoom = map.getZoom();
+  ['tram', 'bus', 'boat'].forEach(kind => {
+    const checked = document.getElementById('toggle' + capitalize(kind)).checked;
+    transitLayers[kind].forEach(layer => {
+      const has = map.hasLayer(layer);
+      if (checked && !has) layer.addTo(map);
+      if (!checked && has) map.removeLayer(layer);
+    });
+    const showStops = MIN_ZOOM_STOPS[kind] !== undefined
+      ? (checked && zoom >= MIN_ZOOM_STOPS[kind])
+      : checked;
+    stopLayers[kind].forEach(marker => {
+      const has = map.hasLayer(marker);
+      if (showStops && !has) marker.addTo(map);
+      if (!showStops && has) map.removeLayer(marker);
+    });
+  });
+}
+
+document.getElementById('toggleTram').addEventListener('change', updateTransitVisibility);
+document.getElementById('toggleBus').addEventListener('change', updateTransitVisibility);
+document.getElementById('toggleBoat').addEventListener('change', updateTransitVisibility);
+map.on('zoomend', () => {
+  updateTransitVisibility();
+  zoneLayer.setStyle(styleForFeature);
+});
+updateTransitVisibility();
+
+// ---------- comparison ----------
+const compareSet = new Set();
+
+function normalizeStr(s){
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+function renderComparePanel(){
+  const container = document.getElementById('comparePanel');
+  if (compareSet.size < 2) {
+    container.style.display = 'none';
+    container.innerHTML = '';
+    return;
+  }
+  container.style.display = 'block';
+  const propsById = {};
+  zonesFC.features.forEach(f => { propsById[f.properties.id] = f.properties; });
+  const ids = Array.from(compareSet).filter(id => propsById[id]);
+
+  const filterKey = `${currentType}|${currentPieces}`;
+  const rowsDef = [
+    { label: 'Commune', get: p => p.commune },
+    { label: 'Prix (filtre actuel)', get: p => {
+        const e = p.prix_par_filtre[filterKey];
+        return (e && e.prix !== null) ? metrics.prix.format(e.prix) : 'insuff.';
+      } },
+    ...CITIES[currentCityKey].metricKeys.filter(k => k !== 'prix' && k !== 'custom').map(k => (
+      { label: metrics[k].label, get: p => metrics[k].format(metrics[k].getValue(p)) }
+    )),
+    { label: 'Ventes analysées', get: p => p.n },
+  ];
+
+  let html = '<table class="compare-table"><thead><tr><th>Comparateur</th>';
+  ids.forEach(id => {
+    html += `<th>${propsById[id].name}<button class="compare-remove" data-id="${id}" title="Retirer">×</button></th>`;
+  });
+  html += '</tr></thead><tbody>';
+  rowsDef.forEach(r => {
+    html += `<tr><td>${r.label}</td>`;
+    ids.forEach(id => { html += `<td>${r.get(propsById[id])}</td>`; });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  container.innerHTML = html;
+
+  container.querySelectorAll('.compare-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      compareSet.delete(btn.dataset.id);
+      renderLegendAndList();
+    });
+  });
+}
+
+// ---------- legend + list ----------
+function renderLegendAndList(){
+  const m = metrics[currentMetric];
+
+  currentRankMap = buildRankMap(zonesFC.features.map(f => [f.properties.id, rankableValue(f.properties)]));
+
+  const vals = zonesFC.features
+    .map(f => ({ props: f.properties, v: currentValueOf(f.properties) }))
+    .filter(x => x.v !== null && x.v !== undefined);
+  const sortedVals = vals.map(x=>x.v).slice().sort((a,b)=>a-b);
+  const avg = sortedVals.length ? sortedVals[Math.floor(sortedVals.length/2)] : null;
+
+  document.getElementById('legendMin').textContent = m.legendMin;
+  document.getElementById('legendMax').textContent = m.legendMax;
+  document.getElementById('avgValue').textContent = avg !== null ? m.format(avg) : '—';
+  document.getElementById('zoneCount').textContent = vals.length;
+
+  const sorted = vals.slice().sort((a,b)=>b.v-a.v);
+  const searchInput = document.getElementById('zoneSearch');
+  const query = normalizeStr(searchInput ? searchInput.value.trim() : '');
+  const visible = query
+    ? sorted.filter(({props}) => normalizeStr(props.name + ' ' + props.commune).includes(query))
+    : sorted;
+
+  const list = document.getElementById('quartierList');
+  list.innerHTML = visible.map(({props, v}) => {
+    const rank = currentRankMap.has(props.id) ? currentRankMap.get(props.id) : null;
+    const color = goodnessToColor(rank);
+    const checked = compareSet.has(props.id) ? 'checked' : '';
+    return `<div class="qrow" data-id="${props.id}">
+      <input type="checkbox" class="compare-cb" data-id="${props.id}" ${checked} title="Ajouter au comparateur">
+      <span class="dot" style="background:${color}"></span>
+      <span class="name" title="${props.name}">${props.name}${props.low_sample ? ' <span class="low-sample-flag" title="Échantillon très faible (moins de 3 ventes)">⚠</span>' : ''}</span>
+      <span class="commune">${props.commune}</span>
+      <span class="val">${m.format(v)}</span>
+    </div>`;
+  }).join('');
+
+  if (query && visible.length === 0) {
+    list.innerHTML = '<div class="subtext" style="margin:8px 0;">Aucune zone ne correspond à cette recherche.</div>';
+  }
+
+  list.querySelectorAll('.compare-cb').forEach(cb => {
+    cb.addEventListener('click', (e) => e.stopPropagation());
+    cb.addEventListener('change', (e) => {
+      const id = cb.dataset.id;
+      if (cb.checked) {
+        if (compareSet.size >= 3) {
+          cb.checked = false;
+          return;
+        }
+        compareSet.add(id);
+      } else {
+        compareSet.delete(id);
+      }
+      renderComparePanel();
+    });
+  });
+
+  list.querySelectorAll('.qrow').forEach(row => {
+    row.addEventListener('click', () => {
+      const layer = layerByZoneId[row.dataset.id];
+      if (layer) {
+        map.fitBounds(layer.getBounds(), { maxZoom: 15 });
+        layer.openPopup();
+      }
+      if (window.matchMedia('(max-width: 820px)').matches) closePanel();
+    });
+  });
+
+  renderComparePanel();
+}
+
+function renderMetricChoices(){
+  const container = document.getElementById('metricChoice');
+  const keys = CITIES[currentCityKey].metricKeys;
+  if (!keys.includes(currentMetric)) currentMetric = 'prix';
+  container.innerHTML = keys.map(k => `
+    <label class="${k === currentMetric ? 'active' : ''}" data-metric="${k}">
+      <input type="radio" name="metric" value="${k}" ${k === currentMetric ? 'checked' : ''}>
+      ${metrics[k].label}
+    </label>`).join('');
+  container.querySelectorAll('label').forEach(label => {
+    label.addEventListener('click', () => {
+      container.querySelectorAll('label').forEach(l => l.classList.remove('active'));
+      label.classList.add('active');
+      currentMetric = label.dataset.metric;
+      document.getElementById('typeFilterBlock').style.display = (currentMetric === 'prix' || currentMetric === 'custom') ? 'block' : 'none';
+      document.getElementById('customWeightsBlock').style.display = currentMetric === 'custom' ? 'block' : 'none';
+      refreshMap();
+    });
+  });
+  document.getElementById('typeFilterBlock').style.display = (currentMetric === 'prix' || currentMetric === 'custom') ? 'block' : 'none';
+  document.getElementById('customWeightsBlock').style.display = currentMetric === 'custom' ? 'block' : 'none';
+}
+
+function renderWeightSliders(){
+  const dims = CITIES[currentCityKey].customDims;
+  const container = document.getElementById('weightSliders');
+  const defaultWeight = Math.round(100 / dims.length);
+  container.innerHTML = dims.map((dim, i) => `
+    <div class="slider-row">
+      <div class="slider-label"><span>${metrics[dim].label}</span><span id="weight-val-${i}">${defaultWeight}%</span></div>
+      <input type="range" id="weight-slider-${i}" min="0" max="100" value="${defaultWeight}">
+    </div>`).join('');
+  dims.forEach((_, i) => {
+    document.getElementById('weight-slider-' + i).addEventListener('input', () => {
+      const w = readWeights();
+      dims.forEach((_, j) => {
+        document.getElementById('weight-val-' + j).textContent = Math.round(w[j] * 100) + '%';
+      });
+      if (currentMetric === 'custom') refreshMap();
+    });
+  });
+}
+
+function refreshMap(){
+  if (currentMetric === 'custom') recomputeCustomScores();
+  zoneLayer.setStyle(styleForFeature);
+  zoneLayer.eachLayer(layer => {
+    layer.setPopupContent(popupContentFor(layer.feature.properties));
+  });
+  renderLegendAndList();
+  syncState();
+}
+
+document.querySelectorAll('#typeChoice label').forEach(label => {
+  label.addEventListener('click', () => {
+    document.querySelectorAll('#typeChoice label').forEach(l => l.classList.remove('active'));
+    label.classList.add('active');
+    currentType = label.dataset.type;
+    refreshMap();
+  });
+});
+
+document.querySelectorAll('#piecesChoice label').forEach(label => {
+  label.addEventListener('click', () => {
+    document.querySelectorAll('#piecesChoice label').forEach(l => l.classList.remove('active'));
+    label.classList.add('active');
+    currentPieces = label.dataset.pieces;
+    refreshMap();
+  });
+});
+
+document.getElementById('zoneSearch').addEventListener('input', () => renderLegendAndList());
+
+// ---------- responsive panel (mobile) ----------
+const panelEl = document.querySelector('.panel');
+const backdropEl = document.getElementById('panelBackdrop');
+const filterToggleBtn = document.getElementById('filterToggleBtn');
+const panelCloseBtn = document.getElementById('panelCloseBtn');
+
+function openPanel(){
+  panelEl.classList.add('open');
+  backdropEl.classList.add('open');
+}
+function closePanel(){
+  panelEl.classList.remove('open');
+  backdropEl.classList.remove('open');
+}
+filterToggleBtn.addEventListener('click', openPanel);
+panelCloseBtn.addEventListener('click', closePanel);
+backdropEl.addEventListener('click', closePanel);
+
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => map.invalidateSize(), 150);
+});
+
+// ---------- city switching ----------
+function loadCity(key){
+  currentCityKey = key;
+  const cfg = CITIES[key];
+  const text = CITY_TEXT[key];
+
+  zonesFC = cfg.zones;
+  transitRoutes = cfg.transit;
+  stopsData = cfg.stops;
+
+  currentMetric = 'prix';
+  currentType = 'tous';
+  currentPieces = 'tous';
+  compareSet.clear();
+  const searchInput = document.getElementById('zoneSearch');
+  if (searchInput) searchInput.value = '';
+  document.querySelectorAll('#typeChoice label').forEach(l => l.classList.toggle('active', l.dataset.type === 'tous'));
+  document.querySelectorAll('#typeChoice input').forEach(i => { i.checked = i.value === 'tous'; });
+  document.querySelectorAll('#piecesChoice label').forEach(l => l.classList.toggle('active', l.dataset.pieces === 'tous'));
+  document.querySelectorAll('#piecesChoice input').forEach(i => { i.checked = i.value === 'tous'; });
+
+  document.getElementById('headerTitle').innerHTML = text.title;
+  document.getElementById('headerDesc').innerHTML = text.desc;
+  document.getElementById('legendCityWord').textContent = text.legendWord;
+  document.getElementById('sourceNote').innerHTML = text.sourceNote;
+  document.getElementById('freshnessNote').textContent = text.freshness;
+  document.getElementById('transitSection').style.display = cfg.hasTransit ? 'block' : 'none';
+
+  document.querySelectorAll('.city-btn').forEach(b => b.classList.toggle('active', b.dataset.city === key));
+
+  renderMetricChoices();
+  renderWeightSliders();
+  buildZoneLayer();
+  clearTransitAndStops();
+  buildTransitAndStops();
+  updateTransitVisibility();
+  fitToZones();
+  refreshMap();
+  if (window.matchMedia('(max-width: 820px)').matches) closePanel();
+}
+
+document.querySelectorAll('.city-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (btn.dataset.city !== currentCityKey) loadCity(btn.dataset.city);
+  });
+});
+
+// ---------- URL state sharing + remembered preferences ----------
+const STORAGE_KEY = 'immoMapState_v1';
+
+function syncState(){
+  const params = new URLSearchParams();
+  params.set('ville', currentCityKey);
+  params.set('metrique', currentMetric);
+  if (currentMetric === 'prix') {
+    params.set('type', currentType);
+    params.set('pieces', currentPieces);
+  }
+  history.replaceState(null, '', '#' + params.toString());
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      ville: currentCityKey, metrique: currentMetric, type: currentType, pieces: currentPieces
+    }));
+  } catch (e) { /* localStorage unavailable (private browsing, etc.) — ignore silently */ }
+}
+
+function readSavedState(){
+  if (location.hash.length > 1) {
+    const params = new URLSearchParams(location.hash.slice(1));
+    if (params.get('ville')) {
+      return {
+        ville: params.get('ville'), metrique: params.get('metrique'),
+        type: params.get('type'), pieces: params.get('pieces')
+      };
+    }
+  }
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) { /* ignore */ }
+  return null;
+}
+
+function applySavedState(){
+  const state = readSavedState();
+  if (state && CITIES[state.ville]) {
+    if (state.ville !== currentCityKey) loadCity(state.ville);
+    if (state.metrique && CITIES[currentCityKey].metricKeys.includes(state.metrique)) {
+      currentMetric = state.metrique;
+    }
+    if (state.type) currentType = state.type;
+    if (state.pieces) currentPieces = state.pieces;
+
+    renderMetricChoices();
+    document.querySelectorAll('#typeChoice label').forEach(l => l.classList.toggle('active', l.dataset.type === currentType));
+    document.querySelectorAll('#typeChoice input').forEach(i => { i.checked = (i.value === currentType); });
+    document.querySelectorAll('#piecesChoice label').forEach(l => l.classList.toggle('active', l.dataset.pieces === currentPieces));
+    document.querySelectorAll('#piecesChoice input').forEach(i => { i.checked = (i.value === currentPieces); });
+    document.getElementById('typeFilterBlock').style.display = (currentMetric === 'prix' || currentMetric === 'custom') ? 'block' : 'none';
+    document.getElementById('customWeightsBlock').style.display = currentMetric === 'custom' ? 'block' : 'none';
+  }
+  // Always render, whether or not a saved state was found — this is what
+  // paints the map on a first-ever visit with no history and no localStorage.
+  refreshMap();
+}
+
+document.getElementById('shareLinkBtn').addEventListener('click', () => {
+  syncState();
+  const btn = document.getElementById('shareLinkBtn');
+  navigator.clipboard.writeText(location.href).then(() => {
+    const original = btn.textContent;
+    btn.textContent = '✓ Lien copié !';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = original; btn.classList.remove('copied'); }, 1800);
+  }).catch(() => {
+    btn.textContent = location.href;
+  });
+});
+
+// ---------- CSV export ----------
+function exportCSV(){
+  const m = metrics[currentMetric];
+  const lines = [['Zone', 'Commune', 'Indicateur', 'Valeur', 'Ventes analysées'].join(';')];
+  zonesFC.features.forEach(f => {
+    const p = f.properties;
+    const v = currentValueOf(p);
+    if (v === null || v === undefined) return;
+    const row = [p.name, p.commune, m.label, String(v).replace('.', ','), p.n]
+      .map(x => `"${String(x).replace(/"/g, '""')}"`);
+    lines.push(row.join(';'));
+  });
+  const csv = '\uFEFF' + lines.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${currentCityKey}_${currentMetric}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+document.getElementById('exportCsvBtn').addEventListener('click', exportCSV);
+
+document.getElementById('sourceNote').innerHTML = CITY_TEXT[currentCityKey].sourceNote;
+document.getElementById('freshnessNote').textContent = CITY_TEXT[currentCityKey].freshness;
+renderMetricChoices();
+renderWeightSliders();
+applySavedState();
+</script>
+</body>
+</html>

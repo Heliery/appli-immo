@@ -1,0 +1,82 @@
+# Configuration pour Bordeaux Métropole.
+# C'est le SEUL fichier à écrire à la main pour une nouvelle ville : tout le
+# reste (téléchargement DVF, GTFS, sécurité, calculs) est automatisé par le
+# pipeline à partir de ces informations.
+
+city_key: bordeaux                  # identifiant court, sans espace (utilisé dans les noms de fichiers)
+city_label: "Bordeaux Métropole"    # nom affiché sur la carte
+
+# Codes INSEE des communes à inclure. Peut être obtenu automatiquement pour
+# tout un EPCI/une métropole via `pipeline.fetch_communes.communes_from_epci`
+# (voir README) plutôt que recopiés à la main.
+insee_codes:
+  - "33063"  # Bordeaux
+  - "33039"  # Bègles
+  - "33069"  # Le Bouscat
+  - "33075"  # Bruges
+  - "33119"  # Cenon
+  - "33162"  # Eysines
+  - "33167"  # Floirac
+  - "33281"  # Mérignac
+  - "33318"  # Pessac
+  - "33522"  # Talence
+  - "33550"  # Villenave-d'Ornon
+  - "33003"  # Ambarès-et-Lagrave
+  - "33004"  # Ambès
+  - "33013"  # Artigues-près-Bordeaux
+  - "33032"  # Bassens
+  - "33056"  # Blanquefort
+  - "33065"  # Bouliac
+  - "33096"  # Carbon-Blanc
+  - "33192"  # Gradignan
+  - "33200"  # Le Haillan
+  - "33249"  # Lormont
+  - "33273"  # Martignas-sur-Jalle
+  - "33312"  # Parempuyre
+  - "33376"  # Saint-Aubin-de-Médoc
+  - "33434"  # Saint-Louis-de-Montferrand
+  - "33449"  # Saint-Médard-en-Jalles
+  - "33487"  # Saint-Vincent-de-Paul
+  - "33519"  # Le Taillan-Médoc
+
+# Années DVF à conserver (cohérence avec le reste de la carte)
+years: ["2024", "2025"]
+
+# Terme de recherche dans le catalogue transport.data.gouv.fr pour trouver le
+# bon GTFS automatiquement (voir pipeline/fetch_gtfs.py). Mets le nom de
+# l'opérateur ou du réseau, pas la ville.
+gtfs_search_term: "TBM"
+
+# Arrêts de référence pour le calcul "temps vers le centre-ville" : noms de
+# stop_name du GTFS qui forment le coeur historique / le hub multimodal.
+# À choisir à la main une fois en regardant stops.txt (aucune API ne devine
+# "le centre-ville" à ta place).
+centre_stop_names:
+  - "Quinconces"
+  - "Grand Théâtre"
+  - "Gambetta"
+  - "Hôtel de Ville"
+  - "Place de la Bourse"
+  - "Sainte-Catherine"
+  - "Porte de Bourgogne"
+
+# Heure d'arrivée cible pour le calcul de temps de trajet (HH:MM:SS)
+arrival_deadline: "08:45:00"
+
+# Fréquence minimale (bus) à conserver, en minutes. Les lignes moins
+# fréquentes que ce seuil sont retirées de la carte transport.
+max_bus_headway_minutes: 20
+
+# Fichier de contours "quartiers" officiels s'il en existe un pour au moins
+# une commune (sinon laisser vide : chaque commune sera affichée en un seul
+# bloc). Ce fichier n'est PAS automatisable : chaque métropole publie ça
+# différemment sur son portail open data.
+quartiers_geojson: null   # ex: "data/quartiers_bordeaux.geojson"
+quartiers_name_field: null      # ex: "nom"
+quartiers_insee_field: null     # ex: "insee"
+
+# Code(s) de région INSEE couvrant ces communes, pour agréger la sécurité
+# SSMSI (une région peut contenir plusieurs codes région si les communes
+# sont à cheval, mais en pratique une seule suffit dans l'immense majorité
+# des cas).
+region_hint: "Nouvelle-Aquitaine"
